@@ -392,6 +392,49 @@ elif opcao == "Busca de Itens (LIKE)":
         except Exception as e:
             st.error(f"Erro: {e}")
 
+# --- QUERY 15: ESTATÍSTICAS DE RECOMPENSAS (MÉDIAS) ---
+elif opcao == "Estatísticas de Recompensas":
+    st.subheader("Estilo dos Mestres: Análise de Recompensas")
+    st.info("Analisa a generosidade dos mestres em Ouro, XP, Títulos e Itens.")
+    
+    sql_query = """
+    WITH RECOMPENSAS_MESTRE AS (
+        SELECT 
+            u.nome_usuario AS nome_mestre, 
+            m.missao_id,
+            r.qtd_ouro,
+            r.qtd_xp,
+            r.titulo,
+            r.rItem_id
+        FROM USUARIO u
+        JOIN MESTRE me ON u.user_id = me.mestreUser_id
+        JOIN SESSAO s ON s.mUser_id = me.mestreUser_id
+        JOIN MISSAO m ON m.s_id = s.sessao_id
+        JOIN RECOMPENSA r ON m.mRecompensa_id = r.recompensa_id
+    )
+    SELECT 
+        nome_mestre, 
+        COUNT(missao_id) AS total_missoes, 
+        ROUND(AVG(qtd_ouro), 2) AS media_ouro,
+        ROUND(AVG(qtd_xp), 0) AS media_xp,
+        ROUND(CAST(COUNT(titulo) AS DECIMAL) / COUNT(missao_id), 2) AS frequencia_titulos,
+        ROUND(CAST(COUNT(rItem_id) AS DECIMAL) / COUNT(missao_id), 2) AS frequencia_itens
+    FROM RECOMPENSAS_MESTRE
+    GROUP BY nome_mestre
+    ORDER BY media_ouro DESC;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+        
+        # Visualização Gráfica Comparativa
+        st.caption("Comparativo de XP Médio por Mestre")
+        st.bar_chart(df.set_index("nome_mestre")["media_xp"])
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
 # --- NOVO: CLASSIFICAÇÃO DE PODER (CASE) ---
 elif opcao == "Classificação de Poder (CASE)":
     st.subheader("Classificação de Jogadores por XP")
