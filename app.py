@@ -33,8 +33,18 @@ opcao = st.sidebar.radio(
     [
         "Listar Personagens (JOIN)", 
         "Estatísticas de Raça (GROUP BY)", 
-        "Jogadores e Mestres (INTERSECT)",   # NOVA
-        "Composição Racial por Classe",      # NOVA
+        "Jogadores e Mestres (INTERSECT)",
+        "Composição Racial por Classe",
+        "Personagens por Jogador",       # Query 1
+        "Missões em Progresso",          # Query 2
+        "Valor do Inventário",           # Query 3
+        "Habilidades por Classe",        # Query 4
+        "NPCs por Mestre",               # Query 5
+        "Ranking de XP",                 # Query 6
+        "Sessões e Missões",             # Query 7
+        "Personagens Mais Fortes",       # Query 8
+        "Missões Mais Lucrativas",       # Query 9
+        "Itens Mais Valiosos",           # Query 10
         "Buscar por ID (WHERE)", 
         "Inserir Item (INSERT)"
     ]
@@ -87,6 +97,219 @@ elif opcao == "Estatísticas de Raça (GROUP BY)":
     col1, col2 = st.columns([1, 2])
     col1.dataframe(df)
     col2.bar_chart(df.set_index("nome_raca")["total_jogadores"])
+
+# --- QUERY 1: PERSONAGENS POR JOGADOR (Com Input Dinâmico) ---
+elif opcao == "Personagens por Jogador":
+    st.subheader("Consultar Personagens de um Jogador")
+    
+    # Input para substituir o valor fixo 'Travis Willingham'
+    nome_jogador = st.text_input("Nome do Jogador:", value="Travis Willingham")
+    
+    sql_query = """
+    SELECT p.nome_personagem, p.nivel, r.nome_raca, c.nome_classe, pc.experiencia
+    FROM PERSONAGEM p
+    JOIN PC ON pc.pc_id = p.personagem_id
+    JOIN JOGADOR j ON j.jogadorUser_id = pc.pc_jogador_id
+    JOIN USUARIO u ON u.user_id = j.jogadorUser_id
+    JOIN RACA r ON r.raca_id = p.personagemRaca_id
+    JOIN CLASSE c ON c.classe_id = p.personagemClasse_id
+    WHERE u.nome_usuario = %s;
+    """
+    
+    st.code(sql_query.replace("%s", f"'{nome_jogador}'"), language="sql")
+    
+    try:
+        # O uso de params previne SQL Injection
+        df = pd.read_sql(sql_query, conn, params=(nome_jogador,))
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.warning("Nenhum personagem encontrado para este jogador.")
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 2: MISSÕES EM PROGRESSO ---
+elif opcao == "Missões em Progresso":
+    st.subheader("Monitoramento de Missões Ativas")
+    
+    sql_query = """
+    SELECT m.nome_missao, m.status, p.nome_personagem, u.nome_usuario
+    FROM MISSAO m
+    JOIN EM_MISSAO em ON em.mMissao_id = m.missao_id
+    JOIN PERSONAGEM p ON p.personagem_id = em.mPersonagem_id
+    LEFT JOIN PC ON PC.pc_id = p.personagem_id
+    LEFT JOIN JOGADOR j ON j.jogadorUser_id = PC.pc_jogador_id
+    LEFT JOIN USUARIO u ON u.user_id = j.jogadorUser_id
+    WHERE m.status = 'Em Progresso'
+    ORDER BY m.missao_id;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 3: VALOR TOTAL DO INVENTÁRIO ---
+elif opcao == "Valor do Inventário":
+    st.subheader("Auditoria de Riqueza dos Personagens")
+    
+    sql_query = """
+    SELECT p.nome_personagem, SUM(i.valor) as valor_total_inventario, COUNT(i.item_id) as qtd_itens
+    FROM PERSONAGEM p
+    JOIN INVENTARIO inv ON inv.iPersonagem_id = p.personagem_id
+    JOIN ITEM i ON i.proprietario_id = inv.inventario_id
+    GROUP BY p.personagem_id, p.nome_personagem
+    ORDER BY valor_total_inventario DESC;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+        # Gráfico extra
+        st.bar_chart(df.set_index("nome_personagem")["valor_total_inventario"])
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 4: HABILIDADES POR CLASSE ---
+elif opcao == "Habilidades por Classe":
+    st.subheader("Catálogo de Habilidades")
+    
+    sql_query = """
+    SELECT c.nome_classe, h.nome as habilidade, h.tipo, h.custo, h.descricao
+    FROM CLASSE c
+    LEFT JOIN HABILIDADE h ON h.classeHabilidade_id = c.classe_id
+    ORDER BY c.nome_classe, h.custo;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 5: NPCS POR MESTRE ---
+elif opcao == "NPCs por Mestre":
+    st.subheader("Criações dos Mestres")
+    
+    sql_query = """
+    SELECT u.nome_usuario as mestre, p.nome_personagem as npc, npc.tipo_NPC, p.nivel
+    FROM NPC npc
+    JOIN MESTRE m ON m.mestreUser_id = npc.mestreNpc_id
+    JOIN USUARIO u ON u.user_id = m.mestreUser_id
+    JOIN PERSONAGEM p ON p.personagem_id = npc.npc_id
+    ORDER BY u.nome_usuario, p.nivel DESC;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 6: RANKING DE XP ---
+elif opcao == "Ranking de XP":
+    st.subheader("Leaderboard de Experiência")
+    
+    sql_query = """
+    SELECT u.nome_usuario, p.nome_personagem, pc.experiencia, p.nivel
+    FROM PC pc
+    JOIN PERSONAGEM p ON p.personagem_id = pc.pc_id
+    JOIN JOGADOR j ON j.jogadorUser_id = pc.pc_jogador_id
+    JOIN USUARIO u ON u.user_id = j.jogadorUser_id
+    ORDER BY pc.experiencia DESC;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 7: SESSÕES E MISSÕES ---
+elif opcao == "Sessões e Missões":
+    st.subheader("Atividade dos Mestres")
+    
+    sql_query = """
+    SELECT u.nome_usuario as mestre, s.titulo, s.data_criacao, 
+           COUNT(m.missao_id) as total_missoes
+    FROM SESSAO s
+    JOIN MESTRE me ON me.mestreUser_id = s.mUser_id
+    JOIN USUARIO u ON u.user_id = me.mestreUser_id
+    LEFT JOIN MISSAO m ON m.s_id = s.sessao_id
+    GROUP BY u.nome_usuario, s.sessao_id, s.titulo, s.data_criacao
+    ORDER BY s.data_criacao;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 8: PERSONAGENS MAIS FORTES ---
+elif opcao == "Personagens Mais Fortes":
+    st.subheader("Top 10: Soma de Atributos")
+    
+    sql_query = """
+    SELECT nome_personagem, forca, destreza, carisma, sabedoria, inteligencia, 
+           (forca + destreza + carisma + sabedoria + inteligencia) as total_atributos
+    FROM PERSONAGEM
+    ORDER BY total_atributos DESC
+    LIMIT 10;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 9: MISSÕES MAIS LUCRATIVAS ---
+elif opcao == "Missões Mais Lucrativas":
+    st.subheader("Recompensas de Ouro por Missão")
+    
+    sql_query = """
+    SELECT m.nome_missao, m.status, r.qtd_ouro, r.qtd_xp, r.titulo, s.titulo as sessao
+    FROM MISSAO m
+    JOIN RECOMPENSA r ON r.recompensa_id = m.mRecompensa_id
+    JOIN SESSAO s ON s.sessao_id = m.s_id
+    ORDER BY r.qtd_ouro DESC;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
+
+# --- QUERY 10: ITENS MAIS VALIOSOS ---
+elif opcao == "Itens Mais Valiosos":
+    st.subheader("Top 15 Itens de Maior Valor")
+    
+    sql_query = """
+    SELECT i.nome_item, i.valor, i.tipo_item, p.nome_personagem
+    FROM ITEM i
+    JOIN INVENTARIO inv ON inv.inventario_id = i.proprietario_id
+    JOIN PERSONAGEM p ON p.personagem_id = inv.iPersonagem_id
+    ORDER BY i.valor DESC
+    LIMIT 15;
+    """
+    
+    st.code(sql_query, language="sql")
+    try:
+        df = pd.read_sql(sql_query, conn)
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro na query: {e}")
 
 # --- NOVA QUERY: JOGADORES QUE SÃO MESTRES ---
 elif opcao == "Jogadores e Mestres (INTERSECT)":
