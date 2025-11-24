@@ -11,7 +11,6 @@ load_dotenv()
 # 2. Conexão com o Banco
 @st.cache_resource
 def init_connection():
-    # Verifica se a URL existe para evitar erro
     if "DATABASE_URL" not in os.environ:
         st.error("Erro: DATABASE_URL não encontrada no arquivo .env")
         st.stop()
@@ -23,17 +22,15 @@ except Exception as e:
     st.error(f"Erro ao conectar no banco: {e}")
     st.stop()
 
-# --- Título e Sidebar ---
 st.title("🐉 Gerenciador de RPG - Banco de Dados")
 st.sidebar.header("Menu de Queries")
 
-# Lista expandida com os conceitos dos PDFs
 opcao = st.sidebar.radio(
     "Escolha a Operação:",
     [
-        "Listar Personagens (JOIN)", 
-        "Estatísticas de Raça (GROUP BY)", 
-        "Jogadores e Mestres (INTERSECT)",
+        "Listar Personagens", 
+        "Estatísticas de Raça", 
+        "Jogadores e Mestres",
         "Composição Racial por Classe",
         "Personagens por Jogador",       
         "Missões em Progresso",           
@@ -45,21 +42,19 @@ opcao = st.sidebar.radio(
         "Personagens Mais Fortes",       
         "Missões Mais Lucrativas",       
         "Itens Mais Valiosos",
-        # --- NOVAS OPÇÕES ADICIONADAS ---
-        "Busca de Itens (LIKE)",          # Conceito: Padrão de String
-        "Classificação de Poder (CASE)",  # Conceito: Condicional
-        "Quem nunca jogou? (NOT EXISTS)", # Conceito: Subquery Correlacionada
-        "Média de Riqueza (WITH/CTE)",    # Conceito: Tabela Temporária
-        "Curar Personagem (UPDATE)",      # Conceito: Modificação de dados
-        "Deletar Item (DELETE)",          # Conceito: Remoção de dados
-        # -------------------------------
-        "Buscar por ID (WHERE)", 
-        "Inserir Item (INSERT)"
+        "Busca de Itens",         
+        "Classificação de Poder", 
+        "Quem nunca jogou?",
+        "Média de Riqueza",
+        "Curar Personagem",
+        "Deletar Item",
+        "Buscar por ID", 
+        "Inserir Item"
     ]
 )
 
 # --- QUERY 1: JOIN (Fichas) ---
-if opcao == "Listar Personagens (JOIN)":
+if opcao == "Listar Personagens":
     st.subheader("Fichas de Personagens Completas")
     
     sql_query = """
@@ -83,8 +78,8 @@ if opcao == "Listar Personagens (JOIN)":
     except Exception as e:
         st.error(f"Erro na query: {e}")
 
-# --- QUERY 2: ESTATÍSTICAS (GROUP BY Simples) ---
-elif opcao == "Estatísticas de Raça (GROUP BY)":
+# --- QUERY 2: ESTATÍSTICAS ---
+elif opcao == "Estatísticas de Raça":
     st.subheader("Distribuição de Raças no Mundo")
     
     sql_query = """
@@ -106,7 +101,7 @@ elif opcao == "Estatísticas de Raça (GROUP BY)":
     col1.dataframe(df)
     col2.bar_chart(df.set_index("nome_raca")["total_jogadores"])
 
-# --- QUERY 3: PERSONAGENS POR JOGADOR (Com Input Dinâmico) ---
+# --- QUERY 3: PERSONAGENS POR JOGADOR ---
 elif opcao == "Personagens por Jogador":
     st.subheader("Consultar Personagens de um Jogador")
     
@@ -316,8 +311,8 @@ elif opcao == "Itens Mais Valiosos":
     except Exception as e:
         st.error(f"Erro na query: {e}")
 
-# --- QUERY 13: JOGADORES QUE SÃO MESTRES (INTERSECT) ---
-elif opcao == "Jogadores e Mestres (INTERSECT)":
+# --- QUERY 13: JOGADORES QUE SÃO MESTRES ---
+elif opcao == "Jogadores e Mestres":
     st.subheader("Usuários Híbridos (Jogadores & Mestres)")
     st.info("Esta query identifica usuários que possuem papéis duplicados no sistema.")
 
@@ -365,20 +360,15 @@ elif opcao == "Composição Racial por Classe":
     except Exception as e:
         st.error(f"Erro no SQL: {e}")
 
-# --- NOVO: BUSCA DE ITENS (LIKE) ---
-elif opcao == "Busca de Itens (LIKE)":
-    st.subheader("Busca Textual em Itens")
-    st.info("Conceito: Padrão de String com LIKE (Slide 7 - pg 9)")
-    
+# --- QUERY 15: BUSCA DE ITENS ---
+elif opcao == "Busca de Itens":
     termo = st.text_input("Digite o nome (ou parte) do item:", value="Espada")
     
-    # O uso de % ao redor do termo permite buscar em qualquer parte da string
     sql_query = """
     SELECT i.nome_item, i.tipo_item, i.valor, i.descricao_item 
     FROM ITEM i 
     WHERE i.nome_item ILIKE %s; 
     """
-    # ILIKE é específico do Postgres para Case Insensitive. No SQL padrão seria LIKE.
     
     st.code(sql_query.replace("%s", f"'%{termo}%'"), language="sql")
     
@@ -392,11 +382,8 @@ elif opcao == "Busca de Itens (LIKE)":
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# --- QUERY 15: ESTATÍSTICAS DE RECOMPENSAS (MÉDIAS) ---
+# --- QUERY 16: ESTATÍSTICAS DE RECOMPENSAS ---
 elif opcao == "Estatísticas de Recompensas":
-    st.subheader("Estilo dos Mestres: Análise de Recompensas")
-    st.info("Analisa a generosidade dos mestres em Ouro, XP, Títulos e Itens.")
-    
     sql_query = """
     WITH RECOMPENSAS_MESTRE AS (
         SELECT 
@@ -435,11 +422,8 @@ elif opcao == "Estatísticas de Recompensas":
     except Exception as e:
         st.error(f"Erro na query: {e}")
 
-# --- NOVO: CLASSIFICAÇÃO DE PODER (CASE) ---
-elif opcao == "Classificação de Poder (CASE)":
-    st.subheader("Classificação de Jogadores por XP")
-    st.info("Conceito: Lógica Condicional com CASE WHEN (Slide 8 - pg 37)")
-    
+# --- QUERY 17: CLASSIFICAÇÃO DE PODER ---
+elif opcao == "Classificação de Poder":
     sql_query = """
     SELECT p.nome_personagem, pc.experiencia,
            CASE 
@@ -460,11 +444,8 @@ elif opcao == "Classificação de Poder (CASE)":
     except Exception as e:
         st.error(f"Erro: {e}")
 
-# --- NOVO: QUEM NUNCA JOGOU? (NOT EXISTS) ---
-elif opcao == "Quem nunca jogou? (NOT EXISTS)":
-    st.subheader("Personagens Ociosos")
-    st.info("Conceito: Subquery Correlacionada e NOT EXISTS (Slide 8 - pg 11)")
-    
+# --- QUERY 18: QUEM NUNCA JOGOU? ---
+elif opcao == "Quem nunca jogou?":
     # Encontra personagens que NÃO estão na tabela EM_MISSAO
     sql_query = """
     SELECT p.nome_personagem, c.nome_classe
@@ -484,11 +465,8 @@ elif opcao == "Quem nunca jogou? (NOT EXISTS)":
     except Exception as e:
         st.error(f"Erro: {e}")
 
-# --- NOVO: MÉDIA DE RIQUEZA (WITH/CTE) ---
-elif opcao == "Média de Riqueza (WITH/CTE)":
-    st.subheader("Personagens Acima da Média de Ouro")
-    st.info("Conceito: Common Table Expressions - WITH (Slide 8 - pg 36)")
-    
+# --- QUERY 19: MÉDIA DE RIQUEZA ---
+elif opcao == "Média de Riqueza":    
     # 1. CTE calcula o total de ouro de cada um
     # 2. Select principal filtra quem tem mais que a média
     sql_query = """
@@ -513,11 +491,8 @@ elif opcao == "Média de Riqueza (WITH/CTE)":
     except Exception as e:
         st.error(f"Erro: {e}")
 
-# --- NOVO: CURAR PERSONAGEM (UPDATE) ---
-elif opcao == "Curar Personagem (UPDATE)":
-    st.subheader("Curar Personagem (UPDATE)")
-    st.info("Conceito: Atualização de Dados (Slide 7 - pg 18)")
-    
+# --- QUERY 20: CURAR PERSONAGEM ---
+elif opcao == "Curar Personagem":
     # Selecionar Personagem
     try:
         chars = pd.read_sql("SELECT personagem_id, nome_personagem, pontos_vida FROM PERSONAGEM", conn)
@@ -542,7 +517,7 @@ elif opcao == "Curar Personagem (UPDATE)":
                     conn.commit()
                     st.success(f"PV de {char_select} atualizado para {novo_pv}!")
                     cursor.close()
-                    st.rerun() # Recarrega a página para mostrar valor novo
+                    st.rerun()
                 except Exception as e:
                     conn.rollback()
                     st.error(f"Erro ao atualizar: {e}")
@@ -550,12 +525,8 @@ elif opcao == "Curar Personagem (UPDATE)":
     except Exception as e:
         st.error("Erro ao carregar lista de personagens.")
 
-# --- NOVO: DELETAR ITEM (DELETE) ---
-elif opcao == "Deletar Item (DELETE)":
-    st.subheader("Remover Item do Mundo (DELETE)")
-    st.warning("Ação Irreversível! Conceito: Remoção de Dados (Slide 7 - pg 17)")
-    
-    # Listar itens para deletar
+# --- QUERY 21: DELETAR ITEM ---
+elif opcao == "Deletar Item":
     try:
         items = pd.read_sql("SELECT item_id, nome_item, proprietario_id FROM ITEM ORDER BY item_id DESC LIMIT 50", conn)
         item_id_to_delete = st.selectbox("Escolha o ID do Item para Deletar:", items['item_id'])
@@ -580,9 +551,8 @@ elif opcao == "Deletar Item (DELETE)":
     except Exception as e:
         st.error("Erro ao carregar itens.")
 
-
-# --- QUERY: FILTRO (WHERE) ---
-elif opcao == "Buscar por ID (WHERE)":
+# --- QUERY 22: FILTRO ---
+elif opcao == "Buscar por ID":
     st.subheader("Buscar Detalhes do Personagem")
     
     char_id = st.number_input("Digite o ID do Personagem:", min_value=1, step=1)
@@ -605,8 +575,8 @@ elif opcao == "Buscar por ID (WHERE)":
         finally:
             cursor.close()
 
-# --- QUERY: INSERT (Transação) ---
-elif opcao == "Inserir Item (INSERT)":
+# --- QUERY 23: INSERT ---
+elif opcao == "Inserir Item":
     st.subheader("Criar Novo Item Lendário")
     
     with st.form("form_item"):
@@ -621,7 +591,6 @@ elif opcao == "Inserir Item (INSERT)":
         if submitted:
             try:
                 cursor = conn.cursor()
-                # INSERT com RETURNING para confirmar o ID criado (boa prática)
                 sql = """
                 INSERT INTO item (nome_item, peso, valor, tipo_item, proprietario_id)
                 VALUES (%s, %s, %s, %s, %s)
